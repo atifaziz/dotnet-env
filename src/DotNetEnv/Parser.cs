@@ -38,6 +38,20 @@ namespace DotNetEnv
         {
             Vars vars = new Vars();
 
+            var entries =
+                Parse(lines, isEmbeddedHashComment, (k, rv) =>
+                {
+                    var v = trimWhitespace ? rv.Trim() : rv;
+                    return new KeyValuePair<string, string>(
+                               trimWhitespace ? k.Trim() : k,
+                               unescapeQuotedValues && IsQuoted(v) ? Unescape(v) : v);
+                });
+
+            foreach (var var in entries)
+                vars.Add(var.Key, var.Value);
+
+            return vars;
+
             for (int i = 0; i < lines.Length; i++)
             {
                 string line = lines[i];
@@ -83,10 +97,8 @@ namespace DotNetEnv
 
         public static IEnumerable<KeyValuePair<string, string>> Parse(
             IEnumerable<string> lines,
-            bool trimWhitespace = true,
-            bool isEmbeddedHashComment = true,
-            bool unescapeQuotedValues = true
-        )
+            bool isEmbeddedHashComment,
+            Func<string, string, KeyValuePair<string, string>> selector)
         {
             foreach (var line in lines)
             {
@@ -112,19 +124,7 @@ namespace DotNetEnv
                 if (tokens.Length != 2)
                     return false;
 
-                var = new KeyValuePair<string, string>(tokens[0], tokens[1]);
-
-                if (trimWhitespace)
-                {
-                    var = new KeyValuePair<string, string>(var.Key.Trim(), var.Value.Trim());
-                }
-
-                if (unescapeQuotedValues && IsQuoted(var.Value))
-                {
-                    var = new KeyValuePair<string, string>(var.Key,
-                        Unescape(var.Value.Substring(1, var.Value.Length - 2)));
-                }
-
+                var = selector(tokens[0], tokens[1]);
                 return true;
             }
         }
