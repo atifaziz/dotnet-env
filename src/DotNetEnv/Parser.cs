@@ -1,6 +1,10 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace DotNetEnv
 {
@@ -75,6 +79,54 @@ namespace DotNetEnv
             }
 
             return vars;
+        }
+
+        public static IEnumerable<KeyValuePair<string, string>> Parse(
+            IEnumerable<string> lines,
+            bool trimWhitespace = true,
+            bool isEmbeddedHashComment = true,
+            bool unescapeQuotedValues = true
+        )
+        {
+            foreach (var line in lines)
+            {
+                // skip comments
+                if (IsComment(line))
+                    continue;
+                if (ParseVar(line, out var var))
+                    yield return var;
+            }
+
+            bool ParseVar(string line, out KeyValuePair<string, string> var)
+            {
+                if (isEmbeddedHashComment)
+                {
+                    line = RemoveInlineComment(line);
+                }
+
+                line = RemoveExportKeyword(line);
+
+                string[] tokens = line.Split(new char[] { '=' }, 2);
+
+                // skip malformed lines
+                if (tokens.Length != 2)
+                    return false;
+
+                var = new KeyValuePair<string, string>(tokens[0], tokens[1]);
+
+                if (trimWhitespace)
+                {
+                    var = new KeyValuePair<string, string>(var.Key.Trim(), var.Value.Trim());
+                }
+
+                if (unescapeQuotedValues && IsQuoted(var.Value))
+                {
+                    var = new KeyValuePair<string, string>(var.Key,
+                        Unescape(var.Value.Substring(1, var.Value.Length - 2)));
+                }
+
+                return true;
+            }
         }
 
         private static bool IsQuoted(string s)
